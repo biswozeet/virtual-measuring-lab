@@ -1,0 +1,613 @@
+<title>Virtual Measuring Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout concept: a workshop bench. Instrument on a steel plate at left, controls and
+   working-out on the right; scales drawn like engraved metal. */
+:root{
+  --bg:#E4E8EB; --panel:#F4F6F7; --ink:#12171C; --muted:#56606A; --line:#C4CBD1;
+  --accent:#1546C8; --accent-ink:#FFFFFF; --good:#17703F; --warn:#A85A00; --bad:#B3261E;
+  --metal:#D3D9DE; --metal2:#B7BFC7; --engrave:#171C21; --needle:#D2381F; --face:#EDF0F2;
+  --s2:#1546C8; --s3:#B25E00; --hl:rgba(21,70,200,.16);
+  --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1216; --panel:#171C22; --ink:#E8EBEE; --muted:#9AA4AE; --line:#2A323A;
+  --accent:#7BA0FF; --accent-ink:#0B1020; --good:#5CD08F; --warn:#F0A04B; --bad:#FF8A80;
+  --metal:#2B323A; --metal2:#3A444E; --engrave:#E9ECEF; --needle:#FF6B4A; --face:#1F252C;
+  --s2:#7BA0FF; --s3:#F0A04B; --hl:rgba(123,160,255,.22); color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0E1216; --panel:#171C22; --ink:#E8EBEE; --muted:#9AA4AE; --line:#2A323A;
+  --accent:#7BA0FF; --accent-ink:#0B1020; --good:#5CD08F; --warn:#F0A04B; --bad:#FF8A80;
+  --metal:#2B323A; --metal2:#3A444E; --engrave:#E9ECEF; --needle:#FF6B4A; --face:#1F252C;
+  --s2:#7BA0FF; --s3:#F0A04B; --hl:rgba(123,160,255,.22); color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:clamp(34px,6vw,52px);line-height:1}
+h2{font-size:26px}
+h3{font-size:18px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+p{margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:end;justify-content:space-between}
+.sub{max-width:62ch;color:var(--muted)}
+.tags{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;padding:3px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--muted)}
+
+nav.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;border-bottom:2px solid var(--line)}
+nav.tabs button{flex:0 0 auto;background:none;border:0;border-bottom:4px solid transparent;margin-bottom:-2px;
+  padding:10px 14px;cursor:pointer;font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.02em;color:var(--muted)}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+[hidden]{display:none!important}
+.lab{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:20px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.stagehead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.strip{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--face)}
+.strip svg{display:block}
+.strip svg.fit{width:100%;height:auto;max-width:560px;margin:0 auto}
+.note{color:var(--muted);font-size:13.5px;max-width:70ch}
+.scrollhint{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+svg .mfill{fill:var(--metal)} svg .mfill2{fill:var(--metal2)} svg .face{fill:var(--face)}
+svg .tk{stroke:var(--engrave);fill:none} svg .tx{fill:var(--engrave);font-family:var(--mono);font-weight:600}
+svg .outline{stroke:var(--engrave);fill:none;stroke-width:1.2}
+svg .needle{stroke:var(--needle);fill:none;stroke-linecap:round}
+svg .hub{fill:var(--needle)}
+svg .hl{fill:var(--hl);stroke:var(--accent);stroke-width:1.5}
+svg .hlring{fill:none;stroke:var(--accent);stroke-width:3;stroke-dasharray:6 5}
+svg .s2{fill:var(--s2)} svg .s3{fill:var(--s3)} svg .dim{opacity:.3}
+svg .datum{stroke:var(--needle);stroke-width:1.6}
+
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{background:none;border:0;padding:10px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.opt{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--mono);font-size:13px;font-weight:600}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--hl);color:var(--ink)}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:10px 16px;font-weight:600;cursor:pointer}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+label.lbl{font-size:13px;color:var(--muted);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:20px;font-weight:600}
+.inwrap{display:flex;align-items:center;gap:8px}
+.unit{font-family:var(--mono);font-weight:600;color:var(--muted)}
+.readout{font-family:var(--mono);font-weight:600;font-size:34px;line-height:1.1}
+.readout small{font-size:16px;color:var(--muted)}
+ol.work{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ol.work li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+ol.work li:first-child{border-top:0}
+ol.work li span:last-child{font-family:var(--mono);font-weight:600;text-align:right}
+ol.work li.total{font-weight:600}
+.fb{border-radius:8px;padding:12px 14px;border:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.fb.ok{border-color:var(--good)} .fb.bad{border-color:var(--bad)}
+.fb strong{font-size:16px} .fb.ok strong{color:var(--good)} .fb.bad strong{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.stat b{display:block;font-family:var(--mono);font-size:22px}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.q{font-size:16px;font-weight:500}
+
+.prog{display:flex;flex-direction:column;gap:16px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.empty{color:var(--muted)}
+footer{color:var(--muted);font-size:13px}
+@media (max-width:860px){.lab{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s ease}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <h1>Virtual Measuring Lab</h1>
+      <p class="sub">Practise reading vernier calipers, micrometers, dial gauges and analog meters. Every reading is random, so you can keep going until the scales make sense.</p>
+    </div>
+    <div class="tags"><span class="chip">ITI Fitter</span><span class="chip">ITI Electrician</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Instruments" id="tabs"></nav>
+
+  <main class="lab" id="lab">
+    <section class="card" aria-label="Instrument">
+      <div class="stagehead"><h2 id="instName"></h2><span class="chip" id="tradeChip"></span></div>
+      <div id="overview"></div>
+      <div class="strip" id="strip"><div id="scope"></div></div>
+      <span class="scrollhint" id="scrollhint" hidden>Scroll sideways along the scale</span>
+      <p class="note" id="note"></p>
+    </section>
+
+    <aside class="side">
+      <div class="seg" role="group" aria-label="Mode">
+        <button id="mLearn" aria-pressed="true">Learn</button>
+        <button id="mPractice" aria-pressed="false">Practice</button>
+      </div>
+
+      <div class="card" id="learnPane">
+        <div id="learnOpts" class="row"></div>
+        <div>
+          <label class="lbl" for="learnRange">Move the instrument</label>
+          <input type="range" id="learnRange">
+          <div class="row" style="margin-top:8px">
+            <button class="opt" id="lMinus" aria-label="Decrease by one step">&minus; step</button>
+            <button class="opt" id="lPlus" aria-label="Increase by one step">+ step</button>
+            <label class="row" style="gap:6px;margin-left:auto"><input type="checkbox" id="learnHint" checked> <span class="lbl">Show helper marker</span></label>
+          </div>
+        </div>
+        <div class="readout" id="learnRead"></div>
+        <h3>How to read it</h3>
+        <ol class="work" id="learnWork"></ol>
+      </div>
+
+      <div class="card" id="practicePane" hidden>
+        <div class="row" id="levelRow" role="group" aria-label="Difficulty"></div>
+        <p class="q" id="qText"></p>
+        <div class="inwrap"><input type="text" id="ans" inputmode="decimal" autocomplete="off" aria-label="Your reading"><span class="unit" id="ansUnit"></span></div>
+        <div class="row">
+          <button class="btn" id="bCheck">Check reading</button>
+          <button class="btn ghost" id="bHint">Hint (&minus;3 pts)</button>
+          <button class="btn ghost" id="bNext" hidden>Next reading</button>
+        </div>
+        <div id="fb" aria-live="polite"></div>
+        <div class="stats">
+          <div class="stat"><b id="stScore">0</b><span>Points</span></div>
+          <div class="stat"><b id="stStreak">0</b><span>In a row</span></div>
+          <div class="stat"><b id="stAcc">&ndash;</b><span>Accuracy</span></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="card prog" id="progress" hidden aria-label="My progress"></section>
+
+  <footer>Readings are generated in your browser. Progress is saved on this device only.</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var rnd=function(a,b){return Math.floor(Math.random()*(b-a+1))+a};
+var pick=function(a){return a[rnd(0,a.length-1)]};
+var f=function(v,d){return Number(v).toFixed(d)};
+var line=function(x1,y1,x2,y2,cls,w){return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" class="'+(cls||'tk')+'" stroke-width="'+(w||1.4)+'"/>'};
+var text=function(x,y,t,sz,anchor,cls){return '<text x="'+x+'" y="'+y+'" class="tx '+(cls||'')+'" font-size="'+sz+'" text-anchor="'+(anchor||'middle')+'">'+t+'</text>'};
+var rad=function(d){return d*Math.PI/180};
+
+/* ---------- instruments ---------- */
+var LAB={};
+
+LAB.vernier={
+  name:'Vernier caliper', trade:'Fitter', unit:'mm',
+  levels:{1:{n:10,desc:'Least count 0.1 mm'},2:{n:20,desc:'Least count 0.05 mm'},3:{n:50,desc:'Least count 0.02 mm'}},
+  note:'Main scale: 1 division = 1 mm. On the vernier, n divisions cover n − 1 mm, so the least count is 1 ÷ n mm. Read the main scale to the left of the vernier zero, then find the one vernier line that lines up with a main-scale line.',
+  learnState:function(){return {n:50,k:50*23+14,step:0.02}},
+  gen:function(level){var n=this.levels[level].n;return {n:n,k:rnd(3*n,95*n),step:1/n}},
+  val:function(s){return s.k/s.n}, dec:function(s){return s.n===10?1:2},
+  sliderMax:function(s){return s.n*95},
+  steps:function(s){
+    var msr=Math.floor(s.k/s.n),v=s.k%s.n,lc=1/s.n,d=this.dec(s);
+    return [['Main scale, last mm line before the vernier zero',msr+' mm'],
+      ['Least count','1 mm ÷ '+s.n+' = '+lc+' mm'],
+      ['Vernier line that lines up with a main-scale line','line '+v],
+      ['Vernier reading',v+' × '+lc+' = '+f(v/s.n,d)+' mm'],
+      ['Total',f(s.k/s.n,d)+' mm']];
+  },
+  diag:function(s,ans,err){
+    var a=Math.abs(err),lc=1/s.n,dir=err>0?'high':'low';
+    var sl=scaleSlip(ans,this.val(s),s.step); if(sl) return sl;
+    if(a>=1-lc*0.5 && Math.abs(a-Math.round(a))<lc*0.5) return {tag:'msr',msg:'Main-scale slip: you are '+Math.round(a)+' mm too '+dir+'. Use the last full mm line to the left of the vernier zero.'};
+    if(a<1) return {tag:'vsd',msg:'Vernier slip: '+f(a/lc,0)+' least count(s) too '+dir+'. Look for the one vernier line that lines up exactly with a main-scale line.'};
+    return {tag:'both',msg:'Both parts are off. Re-read the main scale first, then the vernier line.'};
+  },
+  tags:{msr:'Main scale slips',vsd:'Vernier line slips',both:'Main scale and vernier slips',unit:'Unit or decimal slips'},
+  render:function(s,o){
+    var n=s.n,msr=Math.floor(s.k/n),vv=s.k%n,L=s.k/n,sc=56,pad=50;
+    var w0=Math.max(0,msr-3),w1=msr+n+2;
+    var X=function(m){return pad+(m-w0)*sc};
+    var W=Math.round(X(w1)+pad),H=215,yb=110,g='';
+    g+='<rect x="0" y="24" width="'+W+'" height="'+(yb-24)+'" class="mfill"/>';
+    for(var m=w0;m<=w1;m++){
+      var big=m%10===0,mid=m%5===0,len=big?34:(mid?26:18);
+      g+=line(X(m),yb,X(m),yb-len,'tk',big?2:1.4);
+      if(big) g+=text(X(m),yb-44,m,17);
+    }
+    var x0=X(L),x1=X(L+n-1);
+    g+='<rect x="'+(x0-16)+'" y="'+yb+'" width="'+(x1-x0+32)+'" height="84" rx="4" class="mfill2"/>';
+    var q=n/10;
+    for(var i=0;i<=n;i++){
+      var xx=X(L+i*(n-1)/n),lab=i%q===0;
+      g+=line(xx,yb,xx,yb+(lab?30:18),'tk',lab?2:1.4);
+      if(lab) g+=text(xx,yb+50,i/q,15);
+    }
+    g+=line(0,yb,W,yb,'tk',1.2);
+    g+=text(x0-12,yb+76,'mm ÷ 10',11,'start');
+    if(o.hint){var xc=X(msr+vv);g+='<rect x="'+(xc-9)+'" y="'+(yb-52)+'" width="18" height="108" rx="3" class="hl"/>'}
+    return {overview:this.overview(L),scope:'<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Vernier caliper scales">'+g+'</svg>',
+      scroll:function(){return o.hint?(X(msr+vv)-260):(X(L)-110)}};
+  },
+  overview:function(L){
+    var xj=60+L*6;
+    return '<svg viewBox="0 0 800 150" width="100%" role="img" aria-label="Vernier caliper holding a specimen"><defs><pattern id="ht" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" class="mfill"/><line x1="0" y1="0" x2="0" y2="8" stroke="var(--muted)" stroke-width="2"/></pattern></defs>'
+      +'<rect x="40" y="30" width="730" height="26" class="mfill"/><rect x="40" y="30" width="20" height="104" class="mfill2"/>'
+      +'<rect x="60" y="84" width="'+(xj-60)+'" height="44" fill="url(#ht)" class="outline"/>'
+      +'<rect x="'+xj+'" y="26" width="22" height="108" class="mfill2"/><rect x="'+xj+'" y="26" width="150" height="40" rx="4" class="mfill2"/>'
+      +text(60+(xj-60)/2,114,'specimen',13,'middle','')+'</svg>';
+  }
+};
+
+LAB.micrometer={
+  name:'Micrometer screw gauge', trade:'Fitter · Electrician (SWG wire)', unit:'mm',
+  levels:{1:{desc:'Readings in steps of 0.1 mm'},2:{desc:'Readings in steps of 0.05 mm'},3:{desc:'Any reading to 0.01 mm'}},
+  note:'Sleeve: lines above the datum line are whole millimetres, lines below are half millimetres. One turn of the thimble moves 0.5 mm and has 50 divisions, so one thimble division = 0.01 mm. Add the sleeve reading to the thimble line that sits on the datum line.',
+  learnState:function(){return {h:1237,step:0.01}},
+  gen:function(level){var h=level===1?10*rnd(5,249):(level===2?5*rnd(10,499):rnd(50,2499));return {h:h,step:0.01}},
+  val:function(s){return s.h/100}, dec:function(){return 2}, sliderMax:function(){return 2499},
+  steps:function(s){
+    var whole=Math.floor(s.h/100),half=(s.h%100)>=50,T=s.h%50;
+    return [['Sleeve, whole mm lines visible',whole+' mm'],
+      ['Half-mm line below the datum visible?',half?'Yes, add 0.5 mm':'No, add 0 mm'],
+      ['Thimble line on the datum',T+' × 0.01 = '+f(T/100,2)+' mm'],
+      ['Total',f(s.h/100,2)+' mm']];
+  },
+  diag:function(s,ans,err){
+    var a=Math.abs(err),dir=err>0?'high':'low';
+    var sl=scaleSlip(ans,this.val(s),s.step); if(sl) return sl;
+    if(Math.abs(a-0.5)<0.005) return {tag:'half',msg:'Half-millimetre slip: you are 0.5 mm too '+dir+'. Check whether the half-mm line below the datum is visible.'};
+    if(a>=0.995 && Math.abs(a-Math.round(a*2)/2)<0.005) return {tag:'sleeve',msg:'Sleeve counting slip: you are '+f(a,1)+' mm too '+dir+'. Count the whole-mm lines again from zero.'};
+    if(a<0.5) return {tag:'thimble',msg:'Thimble slip: '+f(a/0.01,0)+' division(s) too '+dir+'. Read the thimble line that sits on the datum line.'};
+    return {tag:'mix',msg:'Check the sleeve first, then the thimble line on the datum.'};
+  },
+  tags:{half:'Half-millimetre mark',sleeve:'Sleeve mm counting',thimble:'Thimble reading',mix:'Mixed slips',unit:'Unit or decimal slips'},
+  render:function(s,o){
+    var h=s.h,L=h/100,sx=30,x0=100,xe=x0+L*sx,W=1170,H=250,yd=125,dy=9,T=h%50,g='';
+    g+='<rect x="0" y="62" width="74" height="126" rx="6" class="mfill2"/>';
+    g+='<rect x="66" y="42" width="'+(x0+25.8*sx-66)+'" height="166" rx="4" class="mfill"/>';
+    for(var i=0;i<=25;i++){
+      var x=x0+i*sx,len=i%5===0?36:24;
+      g+=line(x,yd,x,yd-len,'tk',i%5===0?2:1.4);
+      if(i%5===0) g+=text(x,yd-46,i,16);
+      if(i<25) g+=line(x+sx/2,yd,x+sx/2,yd+16,'tk',1.4);
+    }
+    g+=line(66,yd,xe+4,yd,'tk',2);
+    if(o.hint){var sl=Math.floor(h/100)+((h%100)>=50?0.5:0);g+='<rect x="'+(x0+sl*sx-9)+'" y="'+(yd-52)+'" width="18" height="84" rx="3" class="hl"/>'}
+    g+='<defs><clipPath id="thc"><rect x="'+xe+'" y="52" width="230" height="146" rx="6"/></clipPath></defs>';
+    g+='<rect x="'+xe+'" y="52" width="230" height="146" rx="6" class="mfill2"/>';
+    g+='<rect x="'+(xe+230)+'" y="78" width="70" height="94" rx="8" class="mfill"/>';
+    g+='<g clip-path="url(#thc)">';
+    for(var j=-9;j<=9;j++){
+      var m=T+j,y=yd-j*dy,lab=((m%50)+50)%50,five=lab%5===0;
+      g+=line(xe+12,y,xe+12+(five?30:16),y,'tk',five?2:1.3);
+      if(five) g+=text(xe+52,y+5,lab,14,'start');
+    }
+    g+='</g>';
+    g+='<rect x="'+xe+'" y="52" width="230" height="146" rx="6" class="outline"/>';
+    g+=line(xe-14,yd,xe+8,yd,'datum',2.2);
+    return {overview:'',scope:'<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Micrometer sleeve and thimble">'+g+'</svg>',
+      scroll:function(){return xe-420}};
+  },
+  overview:function(){return ''}
+};
+
+LAB.dial={
+  name:'Dial gauge', trade:'Fitter', unit:'mm',
+  levels:{1:{desc:'Readings in steps of 0.1 mm'},2:{desc:'Readings in steps of 0.05 mm'},3:{desc:'Any reading to 0.01 mm'}},
+  note:'One turn of the large needle = 1 mm, with 100 divisions of 0.01 mm each. The small dial counts whole millimetres (0 to 10). Reading = whole mm from the small dial + large needle divisions × 0.01 mm.',
+  learnState:function(){return {h:346,step:0.01}},
+  gen:function(level){var h,ok=false;while(!ok){h=level===1?10*rnd(5,99):(level===2?5*rnd(10,199):rnd(50,999));var r=h%100;ok=level===3||(r>=6&&r<=94)}return {h:h,step:0.01}},
+  val:function(s){return s.h/100}, dec:function(){return 2}, sliderMax:function(){return 999},
+  steps:function(s){
+    var w=Math.floor(s.h/100),r=s.h%100;
+    return [['Small dial, whole mm',w+' mm'],['Large needle',r+' divisions × 0.01 = '+f(r/100,2)+' mm'],['Total',f(s.h/100,2)+' mm']];
+  },
+  diag:function(s,ans,err){
+    var a=Math.abs(err),dir=err>0?'high':'low';
+    var sl=scaleSlip(ans,this.val(s),s.step); if(sl) return sl;
+    if(a>=0.995 && Math.abs(a-Math.round(a))<0.005) return {tag:'rev',msg:'Revolution count slip: you are '+Math.round(a)+' mm too '+dir+'. The small dial gives the whole millimetres.'};
+    return {tag:'needle',msg:'Needle slip: '+f(a/0.01,0)+' division(s) too '+dir+'. Each division on the large dial is 0.01 mm.'};
+  },
+  tags:{rev:'Whole-mm revolution count',needle:'Large needle reading',unit:'Unit or decimal slips'},
+  render:function(s,o){
+    var h=s.h,L=h/100,cx=230,cy=225,R=190,g='';
+    var P=function(r,d){return [cx+r*Math.sin(rad(d)),cy-r*Math.cos(rad(d))]};
+    g+='<circle cx="'+cx+'" cy="'+cy+'" r="208" class="mfill2"/><circle cx="'+cx+'" cy="'+cy+'" r="192" class="face outline"/>';
+    g+='<rect x="210" y="424" width="40" height="34" rx="4" class="mfill2"/>';
+    for(var i=0;i<100;i++){
+      var d=i*3.6,len=i%10===0?24:(i%5===0?17:10),a=P(R-6,d),b=P(R-6-len,d);
+      g+=line(a[0].toFixed(1),a[1].toFixed(1),b[0].toFixed(1),b[1].toFixed(1),'tk',i%10===0?2.2:1.2);
+      if(i%10===0){var t=P(R-48,d);g+=text(t[0].toFixed(1),(t[1]+6).toFixed(1),i,18)}
+    }
+    var sc={x:cx,y:cy-64,r:40};
+    g+='<circle cx="'+sc.x+'" cy="'+sc.y+'" r="'+sc.r+'" class="face outline"/>';
+    for(var k=0;k<10;k++){
+      var dd=k*36,a2=[sc.x+sc.r*Math.sin(rad(dd))*0.97,sc.y-sc.r*Math.cos(rad(dd))*0.97],b2=[sc.x+(sc.r-9)*Math.sin(rad(dd)),sc.y-(sc.r-9)*Math.cos(rad(dd))],t2=[sc.x+(sc.r-19)*Math.sin(rad(dd)),sc.y-(sc.r-19)*Math.cos(rad(dd))+4];
+      g+=line(a2[0].toFixed(1),a2[1].toFixed(1),b2[0].toFixed(1),b2[1].toFixed(1),'tk',1.6);
+      g+=text(t2[0].toFixed(1),t2[1].toFixed(1),k,11);
+    }
+    var sa=(L/10)*360,tip=[sc.x+(sc.r-8)*Math.sin(rad(sa)),sc.y-(sc.r-8)*Math.cos(rad(sa))];
+    g+=line(sc.x,sc.y,tip[0].toFixed(1),tip[1].toFixed(1),'needle',3)+'<circle cx="'+sc.x+'" cy="'+sc.y+'" r="4" class="hub"/>';
+    if(o.hint) g+='<circle cx="'+sc.x+'" cy="'+sc.y+'" r="'+(sc.r+8)+'" class="hlring"/>';
+    g+=text(cx,cy+84,'mm',16)+text(cx,cy+104,'0.01',13);
+    var ba=((h%100)/100)*360,bt=P(R-12,ba),bl=P(36,ba+180);
+    g+=line(bl[0].toFixed(1),bl[1].toFixed(1),bt[0].toFixed(1),bt[1].toFixed(1),'needle',4)+'<circle cx="'+cx+'" cy="'+cy+'" r="11" class="hub"/>';
+    return {overview:'',scope:'<svg class="fit" viewBox="0 0 460 462" role="img" aria-label="Dial gauge">'+g+'</svg>',scroll:null};
+  },
+  overview:function(){return ''}
+};
+
+LAB.meter={
+  name:'Analog voltmeter', trade:'Electrician', unit:'V',
+  levels:{1:{desc:'Needle on a numbered line'},2:{desc:'Needle on any small division'},3:{desc:'Needle halfway between divisions'}},
+  note:'Pick the scale that matches the range switch. Every scale has 50 divisions, so one small division = range ÷ 50. On the 250 V range, one division is 5 V; on 50 V it is 1 V; on 10 V it is 0.2 V.',
+  learnState:function(){return {range:50,d2:35,step:0.5}},
+  gen:function(level){var r=pick([10,50,250]),d2=level===1?10*rnd(1,9):(level===2?2*rnd(2,48):rnd(4,96));return {range:r,d2:d2,step:level===3?r/100:r/50}},
+  val:function(s){return s.d2*s.range/100}, dec:function(){return 1}, sliderMax:function(){return 100},
+  steps:function(s){
+    var u=s.range/50,d=s.d2/2;
+    return [['Range switch',s.range+' V, so use the 0–'+s.range+' scale'],['Value of one small division',s.range+' ÷ 50 = '+u+' V'],
+      ['Needle position',d+' divisions'],['Reading',d+' × '+u+' = '+f(d*u,1)+' V']];
+  },
+  diag:function(s,ans,err){
+    var val=this.val(s),a=Math.abs(err),u=s.range/50;
+    if(val>0){var r=ans/val;
+      var bad=[5,25,0.2,0.04,10,0.1,50,0.02,2.5,0.4];
+      for(var i=0;i<bad.length;i++){ if(Math.abs(r/bad[i]-1)<0.02) return {tag:'scale',msg:'Wrong scale for this range. The switch is on '+s.range+' V, so read the 0–'+s.range+' scale (one division = '+u+' V).'}}}
+    var sl=scaleSlip(ans,val,s.step); if(sl) return sl;
+    return {tag:'div',msg:'Division counting slip: you are '+f(a/u,1)+' division(s) '+(err>0?'high':'low')+'. One small division is '+u+' V on this range.'};
+  },
+  tags:{scale:'Wrong scale for the range',div:'Division counting',unit:'Unit or decimal slips'},
+  render:function(s,o){
+    var R=s.range,d=s.d2/2,px=320,py=330,g='';
+    var P=function(r,dv){var a=rad(-50+dv*2);return [px+r*Math.sin(a),py-r*Math.cos(a)]};
+    g+='<rect x="10" y="20" width="620" height="330" rx="22" class="mfill2"/><rect x="22" y="32" width="596" height="306" rx="14" class="face"/>';
+    var a0=P(268,0),a1=P(268,50);
+    g+='<path d="M'+a0[0].toFixed(1)+','+a0[1].toFixed(1)+' A268,268 0 0 1 '+a1[0].toFixed(1)+','+a1[1].toFixed(1)+'" class="tk" stroke-width="1.6"/>';
+    var rows=[[10,226,''],[50,199,'s2'],[250,172,'s3']];
+    for(var i=0;i<=50;i++){
+      var five=i%5===0,p=P(268,i),q=P(268-(five?20:10),i);
+      g+=line(p[0].toFixed(1),p[1].toFixed(1),q[0].toFixed(1),q[1].toFixed(1),'tk',five?2:1.1);
+    }
+    rows.forEach(function(rw){
+      var dim=o.hint&&rw[0]!==R?' dim':'';
+      for(var i=0;i<=50;i+=10){
+        var t=P(rw[1],i);
+        g+=text(t[0].toFixed(1),(t[1]+5).toFixed(1),i*rw[0]/50,rw[0]===10?15:14,'middle',rw[2]+dim);
+      }
+      if(rw[0]===10) for(var j=5;j<=45;j+=10){var tt=P(226,j);g+=text(tt[0].toFixed(1),(tt[1]+5).toFixed(1),j*10/50,15,'middle',dim)}
+    });
+    g+=text(40,262,'0–10 V',14,'start',o.hint&&R!==10?'dim':'')+text(40,284,'0–50 V',14,'start','s2'+(o.hint&&R!==50?' dim':''))+text(40,306,'0–250 V',14,'start','s3'+(o.hint&&R!==250?' dim':''));
+    g+='<rect x="438" y="262" width="150" height="54" rx="6" fill="none" class="outline"/>'+text(513,284,'RANGE',12)+text(513,308,R+' V DC',20);
+    var tip=P(258,d),tl=P(-30,d);
+    g+=line(tl[0].toFixed(1),tl[1].toFixed(1),tip[0].toFixed(1),tip[1].toFixed(1),'needle',3.5)+'<circle cx="'+px+'" cy="'+py+'" r="16" class="hub"/>';
+    return {overview:'',scope:'<svg class="fit" viewBox="0 0 640 360" role="img" aria-label="Analog voltmeter">'+g+'</svg>',scroll:null};
+  },
+  overview:function(){return ''}
+};
+
+function scaleSlip(ans,val,step){
+  if(ans<=0||val<=0) return null;
+  var tol=step*0.5;
+  if(Math.abs(ans*10-val)<tol||Math.abs(ans/10-val)<tol) return {tag:'unit',msg:'Decimal point slip: your number is ten times off. Check where the decimal point goes.'};
+  return null;
+}
+
+/* ---------- storage ---------- */
+var KEYS=['vernier','micrometer','dial','meter'];
+var store=load();
+function blank(){var o={pts:0,i:{}};KEYS.forEach(function(k){o.i[k]={a:0,c:0,lvl:1,auto:true,sc:0,sw:0,streak:0,m:{}}});return o}
+function load(){
+  try{var r=localStorage.getItem('vml.v1');if(r){var o=JSON.parse(r);if(o&&o.i)return o}}catch(e){}
+  return blank();
+}
+function save(){try{localStorage.setItem('vml.v1',JSON.stringify(store))}catch(e){}}
+
+/* ---------- state ---------- */
+var tab='vernier',mode='learn',learnHint=true;
+var learn={};KEYS.forEach(function(k){learn[k]=LAB[k].learnState()});
+var prac={};KEYS.forEach(function(k){prac[k]={q:null,done:false,hint:false,res:null}});
+var TABS=KEYS.concat(['progress']);
+var h0=(location.hash||'').replace('#','');if(TABS.indexOf(h0)>-1)tab=h0;
+
+/* ---------- drawing ---------- */
+function draw(){
+  var I=LAB[tab],st=mode==='learn'?learn[tab]:prac[tab].q;
+  if(!st) return;
+  var hint=mode==='learn'?learnHint:(prac[tab].hint||prac[tab].done);
+  var r=I.render(st,{hint:hint});
+  $('#overview').innerHTML=r.overview||'';
+  $('#scope').innerHTML=r.scope;
+  var strip=$('#strip');
+  strip.style.overflowX=r.scroll?'auto':'hidden';
+  if(r.scroll){var sx=Math.max(0,r.scroll());strip.scrollLeft=sx}
+  var svg=$('#scope svg');
+  if(mode==='practice'&&svg){svg.setAttribute('aria-label',I.name+' showing a reading to take')}
+  else if(svg){svg.setAttribute('aria-label',I.name+' reading '+f(I.val(st),I.dec(st))+' '+I.unit)}
+  setTimeout(function(){$('#scrollhint').hidden=!(strip.scrollWidth>strip.clientWidth+4)},0);
+}
+
+function renderTabs(){
+  var h='';
+  TABS.forEach(function(k){
+    h+='<button role="tab" id="tab-'+k+'" data-tab="'+k+'" aria-selected="'+(k===tab)+'">'+(k==='progress'?'My progress':LAB[k].name.replace(' screw gauge','').replace('Analog voltmeter','Analog meter'))+'</button>';
+  });
+  $('#tabs').innerHTML=h;
+}
+
+function show(){
+  renderTabs();
+  var isP=tab==='progress';
+  $('#lab').hidden=isP;$('#progress').hidden=!isP;
+  if(isP){renderProgress();return}
+  var I=LAB[tab];
+  $('#instName').textContent=I.name;
+  $('#tradeChip').textContent=I.trade;
+  $('#note').textContent=I.note;
+  $('#mLearn').setAttribute('aria-pressed',mode==='learn');
+  $('#mPractice').setAttribute('aria-pressed',mode==='practice');
+  $('#learnPane').hidden=mode!=='learn';
+  $('#practicePane').hidden=mode!=='practice';
+  if(mode==='learn') showLearn(); else showPractice();
+  draw();
+}
+
+/* ---------- learn ---------- */
+function showLearn(){
+  var I=LAB[tab],s=learn[tab],o='';
+  if(tab==='vernier'){
+    [[10,'0.1 mm'],[20,'0.05 mm'],[50,'0.02 mm']].forEach(function(x){o+='<button class="opt" data-n="'+x[0]+'" aria-pressed="'+(s.n===x[0])+'">LC '+x[1]+'</button>'});
+  }
+  if(tab==='meter'){
+    [10,50,250].forEach(function(r){o+='<button class="opt" data-r="'+r+'" aria-pressed="'+(s.range===r)+'">'+r+' V range</button>'});
+  }
+  $('#learnOpts').innerHTML=o;$('#learnOpts').hidden=!o;
+  var rg=$('#learnRange');
+  var cur=tab==='vernier'?s.k:(tab==='meter'?s.d2:s.h);
+  rg.min=0;rg.max=I.sliderMax(s);rg.step=1;rg.value=cur;
+  rg.setAttribute('aria-valuetext',f(I.val(s),I.dec(s))+' '+I.unit);
+  $('#learnHint').checked=learnHint;
+  updateLearnReadout();
+}
+function updateLearnReadout(){
+  var I=LAB[tab],s=learn[tab];
+  $('#learnRead').innerHTML=f(I.val(s),I.dec(s))+' <small>'+I.unit+'</small>';
+  $('#learnWork').innerHTML=I.steps(s).map(function(x,i,a){return '<li'+(i===a.length-1?' class="total"':'')+'><span>'+x[0]+'</span><span>'+x[1]+'</span></li>'}).join('');
+}
+function setLearn(v){
+  var s=learn[tab],I=LAB[tab],max=I.sliderMax(s);
+  v=Math.max(0,Math.min(max,v));
+  if(tab==='vernier')s.k=v;else if(tab==='meter')s.d2=v;else s.h=v;
+  $('#learnRange').value=v;updateLearnReadout();draw();
+}
+function learnValue(){var s=learn[tab];return tab==='vernier'?s.k:(tab==='meter'?s.d2:s.h)}
+
+/* ---------- practice ---------- */
+function lvlOf(k){return store.i[k].lvl}
+function newQ(){
+  var p=prac[tab];p.q=LAB[tab].gen(lvlOf(tab));p.q.level=lvlOf(tab);p.done=false;p.hint=false;p.res=null;
+  $('#ans').value='';
+}
+function showPractice(){
+  var I=LAB[tab],S=store.i[tab],p=prac[tab];
+  if(!p.q) newQ();
+  var h='';
+  [1,2,3].forEach(function(l){h+='<button class="opt" data-lvl="'+l+'" aria-pressed="'+(!S.auto&&S.lvl===l)+'" title="'+I.levels[l].desc+'">Level '+l+'</button>'});
+  h+='<button class="opt" data-auto="1" aria-pressed="'+S.auto+'">Auto</button>';
+  $('#levelRow').innerHTML=h;
+  $('#ansUnit').textContent=I.unit;
+  var q='Read the '+I.name.toLowerCase()+' and type the measurement.';
+  q+=' Level '+S.lvl+': '+I.levels[S.lvl].desc.toLowerCase()+'.';
+  if(tab==='meter') q+=' The range switch is on '+p.q.range+' V.';
+  $('#qText').textContent=q;
+  $('#bCheck').disabled=p.done;$('#bHint').disabled=p.done||p.hint;
+  $('#bNext').hidden=!p.done;
+  $('#ans').disabled=p.done;
+  renderFb();renderStats();
+}
+function renderStats(){
+  var S=store.i[tab];
+  $('#stScore').textContent=S.sc;
+  $('#stStreak').textContent=S.streak;
+  $('#stAcc').textContent=S.a?Math.round(100*S.c/S.a)+'%':'–';
+}
+function renderFb(){
+  var p=prac[tab],I=LAB[tab],box=$('#fb');
+  if(!p.done||!p.res){box.innerHTML='';return}
+  var r=p.res,s=p.q,d=I.dec(s);
+  var h='<div class="fb '+(r.ok?'ok':'bad')+'"><strong>'+(r.ok?'Correct. '+f(I.val(s),d)+' '+I.unit:'Not quite. The reading is '+f(I.val(s),d)+' '+I.unit+'.')+'</strong>';
+  if(!r.ok) h+='<span>You entered '+r.ans+' '+I.unit+'. '+r.msg+'</span>';
+  else h+='<span>'+r.pts+' points'+(p.hintUsed?' (hint used)':'')+'.</span>';
+  h+='<ol class="work">'+I.steps(s).map(function(x,i,a){return '<li'+(i===a.length-1?' class="total"':'')+'><span>'+x[0]+'</span><span>'+x[1]+'</span></li>'}).join('')+'</ol></div>';
+  box.innerHTML=h;
+}
+function check(){
+  var p=prac[tab],I=LAB[tab],S=store.i[tab];
+  if(p.done) return;
+  var raw=$('#ans').value.replace(',','.').replace(/[^0-9.\-]/g,'');
+  var ans=parseFloat(raw);
+  if(!isFinite(ans)){$('#fb').innerHTML='<div class="fb bad"><strong>Enter a number</strong><span>For example 23.28</span></div>';return}
+  var s=p.q,val=I.val(s),err=ans-val,ok=Math.abs(err)<s.step*0.5-1e-9;
+  var res={ok:ok,ans:ans};
+  S.a++;
+  if(ok){
+    S.c++;res.pts=p.hint?7:10;S.sc+=res.pts;store.pts+=res.pts;S.streak++;S.cw=(S.cw||0)+1;S.ww=0;
+  }else{
+    var d=I.diag(s,ans,err);res.msg=d.msg;res.pts=0;S.m[d.tag]=(S.m[d.tag]||0)+1;S.streak=0;S.ww=(S.ww||0)+1;S.cw=0;
+  }
+  if(S.auto){
+    if(S.cw>=3&&S.lvl<3){S.lvl++;S.cw=0}
+    else if(S.ww>=2&&S.lvl>1){S.lvl--;S.ww=0}
+  }
+  p.hintUsed=p.hint;p.res=res;p.done=true;save();showPractice();draw();
+}
+
+/* ---------- progress ---------- */
+function renderProgress(){
+  var tot=0,cor=0;KEYS.forEach(function(k){tot+=store.i[k].a;cor+=store.i[k].c});
+  var h='<div class="stagehead"><h2>My progress</h2><span class="chip">'+store.pts+' points</span></div>';
+  if(!tot){
+    h+='<p class="empty">No readings yet. Open an instrument, switch to Practice and take a few readings. Your weak spots will show up here.</p>';
+  }else{
+    h+='<p>'+tot+' readings taken, '+Math.round(100*cor/tot)+'% correct overall.</p>';
+  }
+  h+='<div class="pgrid">';
+  var worst=null,wacc=2;
+  KEYS.forEach(function(k){
+    var S=store.i[k],I=LAB[k],acc=S.a?S.c/S.a:null;
+    if(S.a>=3&&acc<wacc){wacc=acc;worst=k}
+    var top=null,tc=0;Object.keys(S.m).forEach(function(t){if(S.m[t]>tc){tc=S.m[t];top=t}});
+    h+='<div class="card"><div class="stagehead"><h3>'+I.name+'</h3><span class="chip">Level '+S.lvl+'</span></div>'
+      +'<div class="bar" role="img" aria-label="Accuracy '+(acc===null?'none':Math.round(acc*100)+' percent')+'"><i style="width:'+(acc===null?0:Math.round(acc*100))+'%"></i></div>'
+      +'<div class="row" style="justify-content:space-between"><span>'+(acc===null?'Not started':Math.round(acc*100)+'% correct')+'</span><span class="unit">'+S.c+' / '+S.a+'</span></div>'
+      +'<p class="note">'+(top?'Most common slip: <strong>'+I.tags[top]+'</strong> ('+tc+')':(S.a?'No slips logged. Nice.':'Practise this instrument to see your slips.'))+'</p>'
+      +'<button class="btn ghost" data-go="'+k+'">Practise '+I.name.toLowerCase().replace(' screw gauge','')+'</button></div>';
+  });
+  h+='</div>';
+  if(worst) h+='<p><strong>Focus next:</strong> '+LAB[worst].name+'. It is your lowest accuracy so far.</p>';
+  h+='<div class="row"><button class="btn ghost" id="bReset">Reset my progress</button></div>';
+  $('#progress').innerHTML=h;
+}
+
+/* ---------- events ---------- */
+function go(t,m){tab=t;if(m)mode=m;location.hash=t;show()}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tab){go(b.dataset.tab);return}
+  if(b.dataset.go){go(b.dataset.go,'practice');return}
+  if(b.id==='mLearn'){mode='learn';show();return}
+  if(b.id==='mPractice'){mode='practice';show();return}
+  if(b.id==='lMinus'){setLearn(learnValue()-1);return}
+  if(b.id==='lPlus'){setLearn(learnValue()+1);return}
+  if(b.id==='bCheck'){check();return}
+  if(b.id==='bHint'){prac[tab].hint=true;showPractice();draw();return}
+  if(b.id==='bNext'){newQ();showPractice();draw();$('#ans').focus();return}
+  if(b.id==='bReset'){
+    if(b.dataset.arm){store=blank();save();renderProgress()}
+    else{b.dataset.arm='1';b.textContent='Click again to erase all progress'}
+    return}
+  if(b.dataset.n){var s=learn.vernier,L=s.k/s.n;s.n=+b.dataset.n;s.k=Math.round(L*s.n);s.step=1/s.n;showLearn();draw();return}
+  if(b.dataset.r){learn.meter.range=+b.dataset.r;showLearn();draw();return}
+  if(b.dataset.lvl){var S=store.i[tab];S.lvl=+b.dataset.lvl;S.auto=false;S.cw=0;S.ww=0;save();newQ();showPractice();draw();return}
+  if(b.dataset.auto){store.i[tab].auto=true;save();showPractice();return}
+});
+$('#learnRange').addEventListener('input',function(e){setLearn(+e.target.value)});
+$('#learnHint').addEventListener('change',function(e){learnHint=e.target.checked;draw()});
+$('#ans').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();check()}});
+window.addEventListener('hashchange',function(){var t=location.hash.replace('#','');if(TABS.indexOf(t)>-1&&t!==tab){tab=t;show()}});
+
+/*HOOK*/
+show();
+})();
+</script>
